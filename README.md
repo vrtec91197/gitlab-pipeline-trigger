@@ -1,36 +1,45 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# GitLab Pipeline Trigger
 
-## Getting Started
+A small Next.js app to trigger a GitLab CI pipeline and watch its status
+(and job list) update live, built with shadcn/ui.
 
-First, run the development server:
+## Setup
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+1. Copy the env template and fill in your values:
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+   ```bash
+   cp .env.local.example .env.local
+   ```
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+   - `GITLAB_TOKEN` — a personal or project access token with the `api` scope.
+   - `GITLAB_PROJECT_ID` — the target project's numeric ID or URL-encoded path.
+   - `GITLAB_BASE_URL` — only needed for self-hosted GitLab (defaults to `https://gitlab.com`).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+   No real GitLab project handy? Set `GITLAB_MOCK=true` instead — every
+   request is served from an in-memory fake pipeline that progresses
+   through jobs (build → test → deploy) over about 15 seconds, occasionally
+   ending in a failure, so the full UI can be exercised with no credentials.
 
-## Learn More
+2. Install dependencies and run:
 
-To learn more about Next.js, take a look at the following resources:
+   ```bash
+   npm install
+   npm run dev
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+3. Open [http://localhost:3000](http://localhost:3000), enter a branch or tag, and click **Trigger Pipeline**.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## How it works
 
-## Deploy on Vercel
+- `POST /api/pipelines` — triggers a new pipeline for the given `ref` via
+  `POST /projects/:id/pipeline` on the GitLab API.
+- `GET /api/pipelines/:id` — fetches the pipeline's current status plus its
+  jobs, used by the frontend to poll every 4s while the pipeline is still
+  running.
+- `src/lib/gitlab.js` — the GitLab API client. All requests are made
+  server-side (route handlers), so `GITLAB_TOKEN` is never exposed to the
+  browser.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Stack
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Next.js (App Router) · JavaScript · Tailwind CSS · shadcn/ui
