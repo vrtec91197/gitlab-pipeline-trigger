@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { triggerPipeline, resolveProjectPipeline } from "@/lib/gitlab";
+import { triggerPipeline, listPipelinesForSha } from "@/lib/gitlab";
 
 export async function POST(request) {
   let ref;
@@ -15,11 +15,20 @@ export async function POST(request) {
 
   try {
     const pipeline = await triggerPipeline(ref.trim());
-    // A compliance/security-policy orchestration pipeline may bridge to the
-    // real project pipeline as a downstream child — follow that chain so the
-    // UI ends up tracking the project's actual pipeline, not the wrapper.
-    const resolved = await resolveProjectPipeline(pipeline);
-    return NextResponse.json(resolved, { status: 201 });
+
+    // A compliance framework or security policy can spin up sibling
+    // pipelines for the same commit alongside the one just triggered —
+    // rather than guessing which single one is "the real one", surface all
+    // of them and let the UI show each with its own live status.
+    let pipelines;
+    try {
+      pipelines = await listPipelinesForSha(pipeline.sha);
+    } catch {
+      pipelines = []; // best-effort — don't let this break the trigger flow
+    }
+    if (!pipelines.some((p) => p.id === pipeline.id)) pipelines.push(pipeline);
+
+    return NextResponse.json({ pipelines }, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to trigger pipeline";
     return NextResponse.json({ error: message }, { status: 502 });

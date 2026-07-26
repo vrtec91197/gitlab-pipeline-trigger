@@ -42,19 +42,17 @@ A small Next.js app to trigger a GitLab CI pipeline and watch its status
 
 - `POST /api/pipelines` — triggers a new pipeline for the given `ref` via
   `POST /projects/:id/trigger/pipeline` on the GitLab API, authenticated
-  with `GITLAB_TRIGGER_TOKEN`.
-- `GET /api/pipelines/:id` — fetches the pipeline's current status plus its
-  jobs (via `GITLAB_TOKEN`), used by the frontend to poll every 4s while the
-  pipeline is still running.
+  with `GITLAB_TRIGGER_TOKEN`. A compliance framework or security policy can
+  spin up sibling pipelines for the same commit alongside the one just
+  triggered, so the route also looks up every pipeline sharing that commit's
+  `sha` (`listPipelinesForSha`) and returns all of them — the UI shows one
+  card per pipeline rather than guessing which single one is "the real one".
+- `GET /api/pipelines/:id` — fetches one pipeline's current status plus its
+  jobs (via `GITLAB_TOKEN`); the frontend polls this every 4s, per pipeline,
+  independently, while that pipeline is still running.
 - `src/lib/gitlab.js` — the GitLab API client. All requests are made
   server-side (route handlers), so neither token is ever exposed to the
   browser.
-- If a compliance framework or security policy makes the trigger API hand
-  back a orchestration/wrapper pipeline that just bridges to the real
-  project pipeline as a downstream child, `resolveProjectPipeline()` follows
-  that chain (via `trigger_jobs`, falling back to the deprecated `bridges`
-  route on older instances) down to the pipeline with no further downstream
-  child — that's what gets tracked and shown, not the wrapper.
 
 ## Stack
 
