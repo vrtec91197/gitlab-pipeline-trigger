@@ -65,10 +65,15 @@ export async function triggerPipeline(ref) {
   const triggerToken = process.env.GITLAB_TRIGGER_TOKEN;
   if (!triggerToken) throw new Error("GITLAB_TRIGGER_TOKEN is not configured on the server");
 
+  // multipart/form-data, matching `curl -F token=... -F ref=...` — don't set
+  // Content-Type manually, fetch fills in the multipart boundary itself.
+  const form = new FormData();
+  form.append("token", triggerToken);
+  form.append("ref", ref);
+
   const res = await fetch(projectUrl("/trigger/pipeline"), {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ token: triggerToken, ref }),
+    body: form,
     cache: "no-store",
   });
 
