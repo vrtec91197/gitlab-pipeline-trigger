@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { triggerPipeline } from "@/lib/gitlab";
+import { triggerPipeline, resolveProjectPipeline } from "@/lib/gitlab";
 
 export async function POST(request) {
   let ref;
@@ -15,7 +15,11 @@ export async function POST(request) {
 
   try {
     const pipeline = await triggerPipeline(ref.trim());
-    return NextResponse.json(pipeline, { status: 201 });
+    // A compliance/security-policy orchestration pipeline may bridge to the
+    // real project pipeline as a downstream child — follow that chain so the
+    // UI ends up tracking the project's actual pipeline, not the wrapper.
+    const resolved = await resolveProjectPipeline(pipeline);
+    return NextResponse.json(resolved, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to trigger pipeline";
     return NextResponse.json({ error: message }, { status: 502 });

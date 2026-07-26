@@ -49,6 +49,12 @@ A small Next.js app to trigger a GitLab CI pipeline and watch its status
 - `src/lib/gitlab.js` — the GitLab API client. All requests are made
   server-side (route handlers), so neither token is ever exposed to the
   browser.
+- If a compliance framework or security policy makes the trigger API hand
+  back a orchestration/wrapper pipeline that just bridges to the real
+  project pipeline as a downstream child, `resolveProjectPipeline()` follows
+  that chain (via `trigger_jobs`, falling back to the deprecated `bridges`
+  route on older instances) down to the pipeline with no further downstream
+  child — that's what gets tracked and shown, not the wrapper.
 
 ## Stack
 

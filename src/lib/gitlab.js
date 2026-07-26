@@ -28,7 +28,12 @@ import fs from "fs";
 // call it's passed to — Node's global fetch is backed by its own internal,
 // separately-versioned copy of undici.
 import { fetch, FormData, Agent } from "undici";
-import { mockTriggerPipeline, mockGetPipeline, mockGetPipelineJobs } from "./gitlab-mock";
+import {
+  mockTriggerPipeline,
+  mockGetPipeline,
+  mockGetPipelineJobs,
+  mockGetPipelineTriggerJobs,
+} from "./gitlab-mock";
 
 const GITLAB_BASE_URL = (process.env.GITLAB_BASE_URL || "https://gitlab.com").replace(/\/$/, "");
 const USE_MOCK = process.env.GITLAB_MOCK === "true";
@@ -121,4 +126,47 @@ export function getPipeline(pipelineId) {
 export function getPipelineJobs(pipelineId) {
   if (USE_MOCK) return mockGetPipelineJobs(pipelineId);
   return gitlabFetch(`/pipelines/${pipelineId}/jobs?per_page=100`);
+}
+
+/** Trigger/bridge jobs for a pipeline — the jobs that spawn a downstream
+ *  pipeline via the `trigger:` keyword, each carrying a `downstream_pipeline`
+ *  reference. `trigger_jobs` replaced the deprecated `bridges` route in
+ *  GitLab 19.2; fall back to `bridges` for older self-hosted instances. */
+export async function getPipelineTriggerJobs(pipelineId) {
+  if (USE_MOCK) return mockGetPipelineTriggerJobs(pipelineId);
+  try {
+    return await gitlabFetch(`/pipelines/${pipelineId}/trigger_jobs`);
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("404")) {
+      return gitlabFetch(`/pipelines/${pipelineId}/bridges`);
+    }
+    throw err;
+  }
+}
+
+const MAX_DOWNSTREAM_HOPS = 5;
+
+/** Compliance-framework / security-policy setups commonly run a *parent*
+ *  orchestration pipeline that itself triggers the real project pipeline as
+ *  a downstream child (via a `trigger:` bridge job), rather than running the
+ *  project's own jobs directly in the pipeline the trigger API hands back.
+ *  Follows that chain down to the pipeline with no further downstream
+ *  child — that's the actual project pipeline, which is what the UI should
+ *  track and show jobs for. A pipeline with no bridge jobs at all (the
+ *  common case when no such policy applies) is returned unchanged. */
+export async function resolveProjectPipeline(pipeline, hops = 0) {
+  if (USE_MOCK || hops >= MAX_DOWNSTREAM_HOPS) return pipeline;
+
+  let triggerJobs;
+  try {
+    triggerJobs = await getPipelineTriggerJobs(pipeline.id);
+  } catch {
+    return pipeline; // best-effort — don't let this break the main trigger flow
+  }
+
+  const downstream = triggerJobs.find((j) => j.downstream_pipeline)?.downstream_pipeline;
+  if (!downstream) return pipeline;
+
+  const child = await getPipeline(downstream.id);
+  return resolveProjectPipeline(child, hops + 1);
 }

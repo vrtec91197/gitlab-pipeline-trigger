@@ -101,3 +101,10 @@ export async function mockGetPipelineJobs(id) {
   if (!pipeline) throw new Error(`Mock pipeline ${id} not found — the dev server may have restarted`);
   return computeJobs(pipeline);
 }
+
+// No compliance/downstream-pipeline scenario in mock mode — a mock pipeline
+// never bridges to a child, so resolveProjectPipeline() always short-circuits
+// on it anyway (see the USE_MOCK check there). Kept for API symmetry.
+export async function mockGetPipelineTriggerJobs() {
+  return [];
+}
