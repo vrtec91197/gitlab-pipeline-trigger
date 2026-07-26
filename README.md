@@ -18,6 +18,11 @@ A small Next.js app to trigger a GitLab CI pipeline and watch its status
      trigger token can't do this, it's a separate, more limited credential.
    - `GITLAB_PROJECT_ID` — the target project's numeric ID or URL-encoded path.
    - `GITLAB_BASE_URL` — only needed for self-hosted GitLab (defaults to `https://gitlab.com`).
+   - `GITLAB_CA_CERT_PATH` — only needed if that self-hosted instance's TLS
+     cert is signed by a corporate/internal CA. Path to a PEM file with that
+     CA's certificate. (Setting `NODE_EXTRA_CA_CERTS` in `.env.local` will
+     *not* work — Node reads that once at process startup, before Next.js
+     has loaded `.env.local` into `process.env`.)
 
    No real GitLab project handy? Set `GITLAB_MOCK=true` instead — every
    request is served from an in-memory fake pipeline that progresses
